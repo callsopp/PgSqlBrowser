@@ -35,10 +35,12 @@ namespace PgSqlBrowser
         private string _QueryString;
         private Stopwatch executionTimer;
         private string _FileNameWithPath;
+        private NpgsqlDataReader q_WorkerReader = null;
+        public event QWInContextChanged qwInContext;
+        public EventArgs d;
+        public delegate void QWInContextChanged(QueryWindow f, EventArgs d);
+        private CancellationTokenSource _cToken;
 
-//        select * from pg_stat_activity;
-//select pg_sleep(1);
-//select * from pg_stat_activity;
         public QueryWindow(peDAC NpgSqlConn, string QueryString = null, string FileNameWithPath = null)
         {
             DAC = NpgSqlConn;
@@ -46,8 +48,6 @@ namespace PgSqlBrowser
             _FileNameWithPath = FileNameWithPath;
             InitializeComponent();
         }
-
-
 
         private void QueryWindow_Load(object sender, EventArgs e)
         {
@@ -69,12 +69,13 @@ namespace PgSqlBrowser
                 SetText();
             }
             fastColoredTextBox1.Language = Language.SQL;
-
+            fastColoredTextBox1.CommentPrefix = "--";
             if (_QueryString != null)
             {
                 fastColoredTextBox1.Text = _QueryString;
                 fastColoredTextBox1.AllowDrop = true;
             }
+
         }
 
         private void SetText()
@@ -120,6 +121,7 @@ namespace PgSqlBrowser
             runQueryToolStripMenuItem.Enabled = false;
             this.UseWaitCursor = true;
             this.Text = this.Text + " executing..";
+            fastColoredTextBox1.BackColor = Color.White;
             q_Worker.RunWorkerAsync();
         }
 
@@ -490,7 +492,10 @@ namespace PgSqlBrowser
             {
                 sql_text = fastColoredTextBox1.Text;
             }
+
+            _cToken = new CancellationTokenSource();
             NpgsqlCommand Command = new NpgsqlCommand(sql_text);
+            _cToken.Token.Register(() => Command.Cancel());
             Command.CommandTimeout = 0;
             DataSet ds = new DataSet();
             _queryException = "";
@@ -503,7 +508,7 @@ namespace PgSqlBrowser
                 Command.Connection.Open();
             }
             
-            using (NpgsqlDataReader q_WorkerReader = Command.ExecuteReader()) 
+            using (q_WorkerReader = Command.ExecuteReader()) 
             {
                     do
                     {
@@ -514,23 +519,26 @@ namespace PgSqlBrowser
                                 e.Cancel = true;
                                 return;
                             }
-                                try
+                            
+
+                            try
+                            {
+                                DataTable dt = new DataTable();
+                                dt.BeginLoadData();
+                                dt.Load(q_WorkerReader);
+                                dt.EndLoadData();
+                                ds.Tables.Add(dt);
+                                _LastQuery += System.Environment.NewLine + "--" + dt.Rows.Count.ToString() + " row(s) affected.";
+                            }
+                            catch (System.Data.DataException de)
+                            {
+                                if (de.Message.Contains("Invalid storage type: DBNull."))
                                 {
-                                    DataTable dt = new DataTable();
-                                    dt.BeginLoadData();
-                                    dt.Load(q_WorkerReader);
-                                    dt.EndLoadData();
-                                    ds.Tables.Add(dt);
-                                    _LastQuery += System.Environment.NewLine + "--" + dt.Rows.Count.ToString() + " row(s) affected.";
+                                    Console.WriteLine(de.Message);
+                                    _LastQuery += System.Environment.NewLine + "Command executed successfully";
                                 }
-                                catch (System.Data.DataException de)
-                                {
-                                    if (de.Message.Contains("Invalid storage type: DBNull."))
-                                    {
-                                        Console.WriteLine(de.Message);
-                                        _LastQuery += System.Environment.NewLine + "Command executed successfully";
-                                    }
-                                }
+                            }
+
                             _x++;
                         }
                     } while (q_WorkerReader.NextResult());
@@ -549,19 +557,23 @@ namespace PgSqlBrowser
             if(e.Error != null)
             {
                 _queryException = e.Error.Message;
-                if (e.Error.Message.Contains("no binary output function available"))
+                string error_l = "(ERROR)";
+                fastColoredTextBox1.BackColor = Color.OrangeRed;
+                if (_queryException.Contains("canceling statement due to user request"))
+                {
+                    error_l = "(CANCELLED)";
+                    fastColoredTextBox1.BackColor = Color.IndianRed;
+                }else if (e.Error.Message.Contains("no binary output function available"))
                 {
                     _queryException += "  - try casting binary columns to ::text";
                 }
-                this.Text = this.Text + "(ERROR)";
-                fastColoredTextBox1.BackColor = Color.OrangeRed;
+                this.Text = this.Text + error_l;
+                
                 OutputToResultContainer(new DataSet());
             }
             else if (e.Cancelled)
             {
-                this.Text = this.Text + "(CANCELLED)";
-                fastColoredTextBox1.BackColor = Color.IndianRed;
-                splitContainer1.Panel2Collapsed = true;
+                /* wont actually be used because of using a cancellation token to cancel the command */
             }
             else
             {
@@ -590,6 +602,7 @@ namespace PgSqlBrowser
         private void cancelToolStripMenuItem_Click(object sender, EventArgs e)
         {
             q_Worker.CancelAsync();
+            _cToken.Cancel();
         }
 
         private void fastColoredTextBox1_Click(object sender, EventArgs e)
@@ -607,7 +620,40 @@ namespace PgSqlBrowser
             fastColoredTextBox1.BackColor = Color.White;
             this.Text = this.Text.Replace("(CANCELLED)","").Replace("(ERROR)","");
         }
-        
+
+        private void QueryWindow_Enter(object sender, EventArgs e)
+        {
+            qwInContext(this, null);
+        }
+
+        public void SaveFile()
+        {
+            if (_FileNameWithPath == null)
+            {
+                saveFileDialog.Filter = "SQL files (*.sql)|*.sql|" + "All files (*.*)|*.*";
+                saveFileDialog.Title = "Save";
+                saveFileDialog.ShowDialog();
+                if (saveFileDialog.FileName != "")
+                {
+                    _FileNameWithPath = saveFileDialog.FileName;
+
+                }
+            }
+
+            if (_FileNameWithPath != null)
+            {
+                fastColoredTextBox1.SaveToFile(_FileNameWithPath, UnicodeEncoding.Unicode);
+                SetText();
+                toolStripStatusLabel2.Text = "| Save complete |";
+            }
+
+
+        }
+
+        private void commentToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            fastColoredTextBox1.CommentSelected();
+        }
     }
 
    

@@ -10,6 +10,7 @@ using System.Windows.Forms;
 using MaterialSkin.Controls;
 using MaterialSkin.Animations;
 using MaterialSkin;
+using System.Diagnostics;
 
 namespace PgSqlBrowser
 {
@@ -28,10 +29,8 @@ namespace PgSqlBrowser
             materialSkinManager.Theme = MaterialSkinManager.Themes.LIGHT;
 
             materialSkinManager.ColorScheme = new ColorScheme(
-                //Primary.BlueGrey900, Primary.BlueGrey700,
-                //Primary.BlueGrey500, Accent.Cyan100,
-                Primary.Grey100, Primary.Grey100,
-                Primary.Grey100, Accent.Green100,
+                Primary.Grey50, Primary.Grey50,
+                Primary.Grey50, Accent.Teal700,
                 TextShade.BLACK);
 
             snameTB.GotFocus += TB_GotFocus;
@@ -72,6 +71,20 @@ namespace PgSqlBrowser
                 MessageBox.Show("Some parameters are missing", "Parameter Error", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
             }
         }
+
+        private void ConnectBox_Load(object sender, EventArgs e)
+        {
+            System.Reflection.Assembly assembly = System.Reflection.Assembly.GetExecutingAssembly();
+            FileVersionInfo fvi = FileVersionInfo.GetVersionInfo(assembly.Location);
+            versionLabel.Text = "PgSqlBrowser v" + fvi.FileVersion;
+        }
+
+        private void materialFlatButton2_Click(object sender, EventArgs e)
+        {
+            this.Close();
+        }
+
+
 
     }
 }

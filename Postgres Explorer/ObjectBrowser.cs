@@ -89,23 +89,17 @@ namespace PgSqlBrowser
                     ConnSuccess(dac, null, null);
                     DAC.Add(dac);
 
-                    string sql_text = @"select schema_name from information_schema.schemata order by schema_name asc;
-                                        select datname from pg_database order by datname asc;
-                                        select schemaname, tablename from pg_tables order by schemaname asc , tablename asc;
-                                        select schemaname, tablename, indexname, tablespace, indexdef from pg_indexes order by schemaname asc, tablename asc, indexname asc, tablespace asc, indexdef asc;
-                                        SELECT r.routine_schema, r.routine_name FROM information_schema.routines r group by r.routine_schema, r.routine_name ORDER BY r.routine_schema asc, r.routine_name asc;
-                                        select schemaname,viewname,viewowner,definition from pg_views order by schemaname asc,viewname asc;
-                                        SELECT sequence_schema,sequence_name FROM information_schema.sequences;
+                    string sql_text = @"select datname from pg_database where datname not in ('template0','template1') order by datname asc;";
 
-                                ";
                     NpgsqlCommand Command = new NpgsqlCommand(sql_text);
-                    DataSet ds = new DataSet();
+                    //DataSet ds = new DataSet();
                     _queryException = "";
                     try
                     {
                         Command.Connection = dac.conn;
+                        DataTable databases_dt = new DataTable();
                         NpgsqlDataAdapter da = new NpgsqlDataAdapter(Command);
-                        da.Fill(ds);
+                        da.Fill(databases_dt);
                         TreeNode rootNode = null;
                         Dictionary<string, string> rootNodeTag = new Dictionary<string, string>();
                         rootNodeTag.Add("servername", dac.serverName);
@@ -126,7 +120,7 @@ namespace PgSqlBrowser
                         parentNode.SelectedImageIndex = 2;
                         TreeNode childNode;
 
-                        foreach (DataRow dr in ds.Tables[1].Rows)
+                        foreach (DataRow dr in databases_dt.Rows)
                         {
                             childNode = parentNode.Nodes.Add((string)dr["datname"]);
                             childNode.ImageIndex = 3;
@@ -136,15 +130,48 @@ namespace PgSqlBrowser
                             childNodeTag.Add("database", (string)dr["datname"]);
                             childNode.Tag = childNodeTag;
 
+                            TreeNode systemObjectsNode;
+                            systemObjectsNode = childNode.Nodes.Add("System Catalogs");
+                            Dictionary<string, string> systemObjectsNodeTag = new Dictionary<string, string>();
+                            systemObjectsNodeTag.Add("servername", dac.serverName);
+                            systemObjectsNodeTag.Add("database", (string)dr["datname"]);
+                            systemObjectsNode.Tag = systemObjectsNodeTag;
+                            systemObjectsNode.ImageIndex = 8;
+                            systemObjectsNode.SelectedImageIndex = 8;
 
+                            peDAC dbdac = new peDAC();
+                            dbdac.checkStatus += new peDAC.connectionAttemptStatus(UpdateStatus);
+                            dbdac.MakeConnection(serverName, (string)dr["datname"], username, pW);
+                            string per_db_sql_text = @" select schema_name from information_schema.schemata where schema_name not in ('pg_toast_temp_1','pg_temp_1') order by schema_name asc;
+                                                select schemaname, tablename from pg_tables order by schemaname asc , tablename asc;
+                                                select schemaname, tablename, indexname, tablespace, indexdef from pg_indexes order by schemaname asc, tablename asc, indexname asc, tablespace asc, indexdef asc;
+                                                SELECT r.routine_schema, r.routine_name FROM information_schema.routines r group by r.routine_schema, r.routine_name ORDER BY r.routine_schema asc, r.routine_name asc;
+                                                select schemaname,viewname,viewowner,definition from pg_views order by schemaname asc,viewname asc;
+                                                SELECT sequence_schema,sequence_name FROM information_schema.sequences;";
+                            NpgsqlCommand DBInfoCommand = new NpgsqlCommand(per_db_sql_text);
+                            DBInfoCommand.Connection = dbdac.conn;
+                            DataSet ds = new DataSet();
+                            NpgsqlDataAdapter dbda = new NpgsqlDataAdapter(DBInfoCommand);
+                            dbda.Fill(ds);
+                            List<string> systemObjects = new List<string>() { "information_schema", "pg_toast" , "pg_catalog" };
                             foreach (DataRow schema in ds.Tables[0].Rows)
                             {
+
                                 TreeNode schemaNode;
-                                schemaNode = childNode.Nodes.Add((string)schema["schema_name"]);
+                                if (systemObjects.Contains((string)schema["schema_name"]))
+                                {
+                                    schemaNode = systemObjectsNode.Nodes.Add((string)schema["schema_name"]);
+                                }
+                                else
+                                {
+                                    schemaNode = childNode.Nodes.Add((string)schema["schema_name"]);
+                                }
                                 Dictionary<string, string> schemaNodeTag = new Dictionary<string, string>();
                                 schemaNodeTag.Add("servername", dac.serverName);
                                 schemaNodeTag.Add("database", (string)dr["datname"]);
                                 schemaNode.Tag = schemaNodeTag;
+                                schemaNode.ImageIndex = 9;
+                                schemaNode.SelectedImageIndex = 9;
 
                                 TreeNode innerTableChildNode;
                                 innerTableChildNode = schemaNode.Nodes.Add("Tables");
@@ -156,7 +183,7 @@ namespace PgSqlBrowser
                                 innerTableChildNode.Tag = innerTableChildNodeTag;
 
 
-                                foreach (DataRow idr in ds.Tables[2].Rows)
+                                foreach (DataRow idr in ds.Tables[1].Rows)
                                 {
                                     if ((string)idr["schemaname"] == (string)schema["schema_name"])
                                     {
@@ -172,9 +199,9 @@ namespace PgSqlBrowser
                                         innerIndexChildNodeTag.Add("database", (string)dr["datname"]);
                                         innerIndexChildNode = innerObjectsChildNode.Nodes.Add("Indexes");
                                         innerIndexChildNode.Tag = innerIndexChildNodeTag;
-                                        innerIndexChildNode.ImageIndex = 5;
-                                        innerIndexChildNode.SelectedImageIndex = 5;
-                                        foreach (DataRow ixdr in ds.Tables[3].Rows)
+                                        innerIndexChildNode.ImageIndex = 10;
+                                        innerIndexChildNode.SelectedImageIndex = 10;
+                                        foreach (DataRow ixdr in ds.Tables[2].Rows)
                                         {
                                             TreeNode innerIndexObjectsChildNode;
                                             if ((string)idr["schemaname"] + "." + (string)idr["tablename"] == (string)ixdr["schemaname"] + "." + (string)ixdr["tablename"])
@@ -192,9 +219,7 @@ namespace PgSqlBrowser
                                         }
                                     }
                                 }
-
-
-
+                                
                                 TreeNode routinesNode;
                                 routinesNode = schemaNode.Nodes.Add("Routines");
                                 Dictionary<string, string> routinesNodeTag = new Dictionary<string, string>();
@@ -204,7 +229,7 @@ namespace PgSqlBrowser
                                 routinesNode.SelectedImageIndex = 5;
                                 routinesNode.Tag = routinesNodeTag;
 
-                                foreach (DataRow fr in ds.Tables[4].Rows)
+                                foreach (DataRow fr in ds.Tables[3].Rows)
                                 {
                                     if ((string)fr["routine_schema"] == (string)schema["schema_name"])
                                     {
@@ -229,7 +254,7 @@ namespace PgSqlBrowser
                                 viewsNode.ImageIndex = 6;
                                 viewsNode.SelectedImageIndex = 6;
                                 viewsNode.Tag = viewsNodeTag;
-                                foreach (DataRow fr in ds.Tables[5].Rows)
+                                foreach (DataRow fr in ds.Tables[4].Rows)
                                 {
                                     if ((string)fr["schemaname"] == (string)schema["schema_name"])
                                     {
@@ -254,7 +279,7 @@ namespace PgSqlBrowser
                                 sequencesNode.ImageIndex = 7;
                                 sequencesNode.SelectedImageIndex = 7;
                                 sequencesNode.Tag = sequencesNodeTag;
-                                foreach (DataRow sequence in ds.Tables[6].Rows)
+                                foreach (DataRow sequence in ds.Tables[5].Rows)
                                 {
                                     if ((string)sequence["sequence_schema"] == (string)schema["schema_name"])
                                     {

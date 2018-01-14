@@ -5,12 +5,12 @@ using System.Runtime.InteropServices;
 // General Information about an assembly is controlled through the following 
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
-[assembly: AssemblyTitle("Postgres Explorer")]
-[assembly: AssemblyDescription("")]
+[assembly: AssemblyTitle("PgSqlBrowser")]
+[assembly: AssemblyDescription("A windows client for accessing postgres databases")]
 [assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany("Microsoft")]
-[assembly: AssemblyProduct("Postgres Explorer")]
-[assembly: AssemblyCopyright("Copyright © Microsoft 2017")]
+[assembly: AssemblyCompany("C-Soft")]
+[assembly: AssemblyProduct("PgSqlBrowser")]
+[assembly: AssemblyCopyright("Copyright © Chris Allsopp 2018")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 

@@ -17,6 +17,7 @@ namespace PgSqlBrowser
     public partial class PgSqllBrowserMain : MaterialForm 
     {
         private peDAC dacInContext = null;
+        private QueryWindow qwInContext = null;
         ObjectBrowser ob1 = new ObjectBrowser();
         int posX;
         int posY;
@@ -31,8 +32,8 @@ namespace PgSqlBrowser
             materialSkinManager.Theme = MaterialSkinManager.Themes.LIGHT;
 
             materialSkinManager.ColorScheme = new ColorScheme(
-                Primary.BlueGrey900, Primary.BlueGrey700,
-                Primary.BlueGrey500, Accent.Cyan100,
+                Primary.Grey100, Primary.Grey100,
+                Primary.Grey100, Accent.Green100,
                 TextShade.BLACK);
         }
 
@@ -71,7 +72,13 @@ namespace PgSqlBrowser
             dacInContext = dac;
             QueryWindow QW;
             QW = new QueryWindow(dac, QueryText);
+            QW.qwInContext += new QueryWindow.QWInContextChanged(SetQueryWindowInContext);
             QW.Show(dockPanel1, DockState.Document);
+        }
+
+        private void SetQueryWindowInContext(QueryWindow f, EventArgs d)
+        {
+            qwInContext = f;
         }
 
         private void SetDACContextChanged(peDAC dac, EventArgs e)
@@ -100,6 +107,7 @@ namespace PgSqlBrowser
                 {
                     QW = new QueryWindow(dac);
                 }
+                QW.qwInContext += new QueryWindow.QWInContextChanged(SetQueryWindowInContext);
                 QW.Show(dockPanel1, DockState.Document);
             }
             else
@@ -182,7 +190,16 @@ namespace PgSqlBrowser
 
         private void saveToolStripMenuItem1_Click(object sender, EventArgs e)
         {
+            if (qwInContext != null)
+            {
+                qwInContext.SaveFile();
+            }
+        }
 
+        private void aboutToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            AboutBox ab = new AboutBox();
+            ab.ShowDialog();
         }
 
 

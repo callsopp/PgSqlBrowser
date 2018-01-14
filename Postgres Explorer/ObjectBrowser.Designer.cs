@@ -69,6 +69,9 @@
             this.tvImageList.Images.SetKeyName(5, "002-circular-shape-silhouette.jpg");
             this.tvImageList.Images.SetKeyName(6, "001-menu.jpg");
             this.tvImageList.Images.SetKeyName(7, "007-seqeunce.jpg");
+            this.tvImageList.Images.SetKeyName(8, "008-system.jpg");
+            this.tvImageList.Images.SetKeyName(9, "009-schema.jpg");
+            this.tvImageList.Images.SetKeyName(10, "010-index.jpg");
             // 
             // menuStrip1
             // 
